@@ -7,6 +7,7 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use keyring::Entry;
 use regex::Regex;
+use rpassword::prompt_password;
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
 enum PinentryArgs {
@@ -44,7 +45,7 @@ impl FromStr for PinentryArgs {
 
 #[derive(Subcommand)]
 enum Commands {
-    Store { password: String },
+    Store,
     Lookup,
     Clear,
 }
@@ -93,7 +94,8 @@ fn main() -> Result<()> {
     let entry = Entry::new("rbw", &user)?;
 
     match args.command {
-        Some(Commands::Store { password }) => {
+        Some(Commands::Store) => {
+            let password = prompt_password("Your master password: ")?;
             entry.set_password(&password)?;
         }
         Some(Commands::Lookup) => {
