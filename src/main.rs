@@ -42,15 +42,11 @@ impl FromStr for PinentryArgs {
     }
 }
 
-#[derive(Subcommand, Default)]
+#[derive(Subcommand)]
 enum Commands {
-    Store {
-        password: String,
-    },
+    Store { password: String },
     Lookup,
     Clear,
-    #[default]
-    Pinentry,
 }
 
 /// Pinentry for rbw using system keyring
@@ -100,17 +96,17 @@ fn main() -> Result<()> {
 
     let entry = Entry::new("rbw", &user)?;
 
-    match args.command.unwrap_or_default() {
-        Commands::Store { password } => {
+    match args.command {
+        Some(Commands::Store { password }) => {
             entry.set_password(&password)?;
         }
-        Commands::Lookup => {
+        Some(Commands::Lookup) => {
             println!("{}", entry.get_password()?);
         }
-        Commands::Clear => {
+        Some(Commands::Clear) => {
             entry.delete_credential()?;
         }
-        Commands::Pinentry => {
+        None => {
             let stdin = io::stdin();
             let stdout = io::stdout();
 
