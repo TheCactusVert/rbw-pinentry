@@ -125,7 +125,7 @@ fn main() -> Result<()> {
                     PinentryArgs::GETPIN if prompt == Some("Master Password".to_string()) => {
                         print_password(&mut handle, &entry.get_password()?)?; // TODO fallback if no password
                         print_ok(&mut handle)?;
-                    }
+                    } // TODO fallback if not master password
                     PinentryArgs::BYE => {
                         break;
                     }
