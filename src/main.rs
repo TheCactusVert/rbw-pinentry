@@ -1,12 +1,12 @@
 use std::{
     io::{self, BufRead, Write},
+    process::Output,
     str::FromStr,
 };
 
 use clap::{Parser, Subcommand};
 use keyring::Entry;
 use regex::Regex;
-use systemd::unit::escape_name;
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 enum PinentryArgs {
@@ -82,29 +82,27 @@ struct Cli {
 
 static SUFFIX: &'static str = "passwd";
 
-fn print_ok<T: Write>(handle: &mut T) {
-    handle.write(b"OK\n");
+fn print_ok<T: Write>(out: &mut T) {
+    out.write(b"OK\n");
 }
 
-fn print_password<T: Write>(handle: &mut T, entry: &Entry) -> keyring::Result<()> {
+fn print_password<T: Write>(out: &mut T, entry: &Entry) -> keyring::Result<()> {
     let password = entry.get_password()?;
-    write!(handle, "D {password}\n");
+    write!(out, "D {password}\n");
     Ok(())
 }
 
-fn print_error<T: Write>(handle: &mut T, message: &str) {
-    write!(handle, "ERR {message}\n");
+fn print_error<T: Write>(out: &mut T, message: &str) {
+    write!(out, "ERR {message}\n");
 }
 
 fn main() -> keyring::Result<()> {
     let args = Cli::parse();
 
-    let user = escape_name(
-        &args
-            .profile
-            .and_then(|p| Some(format!("{p}/{SUFFIX}")))
-            .unwrap_or(SUFFIX.to_string()),
-    );
+    let user = &args
+        .profile
+        .and_then(|p| Some(format!("{p}-{SUFFIX}")))
+        .unwrap_or(SUFFIX.to_string());
 
     let entry = Entry::new("rbw", &user)?;
 
@@ -113,10 +111,8 @@ fn main() -> keyring::Result<()> {
             entry.set_password(&password)?;
         }
         Commands::Lookup => {
-            let stdout = io::stdout();
-            let mut handle = stdout.lock();
-
-            print_password(&mut handle, &entry)?;
+            let password = entry.get_password()?;
+            println!("{password}");
         }
         Commands::Clear => {
             entry.delete_credential()?;
@@ -142,7 +138,7 @@ fn main() -> keyring::Result<()> {
                         print_ok(&mut handle);
                     }
                     PinentryArgs::GETPIN if prompt == Some("Master Password".to_string()) => {
-                        print_password(&mut handle, &entry)?;
+                        print_password(&mut handle, &entry)?; // TODO fallback
                         print_ok(&mut handle);
                     }
                     PinentryArgs::BYE => {
