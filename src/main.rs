@@ -10,10 +10,10 @@ use systemd::unit::escape_name;
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 enum PinentryArgs {
-    SETTITLE { title: String },
-    SETDESC { desc: String },
-    SETPROMPT { prompt: String },
-    SETERROR { error: String },
+    SETTITLE { arg: String },
+    SETDESC { arg: String },
+    SETPROMPT { arg: String },
+    SETERROR { arg: String },
     GETPIN,
     BYE,
     UNKNOWN,
@@ -29,16 +29,16 @@ impl FromStr for PinentryArgs {
         if let Some(code) = re.captures(input) {
             match &code[1] {
                 "SETTITLE" => Ok(PinentryArgs::SETTITLE {
-                    title: code[2].to_string(),
+                    arg: code[2].to_string(),
                 }),
                 "SETDESC" => Ok(PinentryArgs::SETDESC {
-                    desc: code[2].to_string(),
+                    arg: code[2].to_string(),
                 }),
                 "SETPROMPT" => Ok(PinentryArgs::SETPROMPT {
-                    prompt: code[2].to_string(),
+                    arg: code[2].to_string(),
                 }),
                 "SETERROR" => Ok(PinentryArgs::SETERROR {
-                    error: code[2].to_string(),
+                    arg: code[2].to_string(),
                 }),
                 "GETPIN" => Ok(PinentryArgs::GETPIN),
                 "BYE" => Ok(PinentryArgs::BYE),
@@ -124,20 +124,24 @@ fn main() -> keyring::Result<()> {
         Commands::Pinentry => {
             let stdin = io::stdin();
             let stdout = io::stdout();
+
             let mut handle = stdout.lock();
+
+            let mut prompt: Option<String> = None;
 
             for line in stdin.lock().lines() {
                 match PinentryArgs::from_str(&line.unwrap()).unwrap() {
-                    PinentryArgs::SETTITLE { title } => {
+                    PinentryArgs::SETTITLE { arg } => {
                         print_ok(&mut handle);
                     }
-                    PinentryArgs::SETDESC { desc } => {
+                    PinentryArgs::SETDESC { arg } => {
                         print_ok(&mut handle);
                     }
-                    PinentryArgs::SETPROMPT { prompt } => {
+                    PinentryArgs::SETPROMPT { arg } => {
+                        prompt = Some(arg);
                         print_ok(&mut handle);
                     }
-                    PinentryArgs::GETPIN => {
+                    PinentryArgs::GETPIN if prompt == Some("Master Password".to_string()) => {
                         print_password(&mut handle, &entry)?;
                         print_ok(&mut handle);
                     }
