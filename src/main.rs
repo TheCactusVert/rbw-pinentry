@@ -73,11 +73,11 @@ struct Cli {
 
     /// Timeout waiting for input after this many seconds
     #[arg(short = 'o', long = "timeout", default_value = "0")]
-    timeout: u64,
+    timeout: u64, // TODO Do something with this ?
 
     /// Set the tty terminal node name
     #[arg(short = 'T', long = "ttyname")]
-    ttyname: Option<String>,
+    ttyname: Option<String>, // TODO Do something with this ?
 }
 
 static SUFFIX: &'static str = "passwd";
