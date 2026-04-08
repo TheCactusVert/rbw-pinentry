@@ -8,12 +8,12 @@ use clap::{Parser, Subcommand};
 use keyring::Entry;
 use regex::Regex;
 
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
 enum PinentryArgs {
-    SETTITLE { arg: String },
-    SETDESC { arg: String },
-    SETPROMPT { arg: String },
-    SETERROR { arg: String },
+    SETTITLE(String),
+    SETDESC(String),
+    SETPROMPT(String),
+    SETERROR(String),
     GETPIN,
     BYE,
     UNKNOWN,
@@ -28,21 +28,13 @@ impl FromStr for PinentryArgs {
 
         if let Some(code) = re.captures(input) {
             match &code[1] {
-                "SETTITLE" => Ok(PinentryArgs::SETTITLE {
-                    arg: code[2].to_string(),
-                }),
-                "SETDESC" => Ok(PinentryArgs::SETDESC {
-                    arg: code[2].to_string(),
-                }),
-                "SETPROMPT" => Ok(PinentryArgs::SETPROMPT {
-                    arg: code[2].to_string(),
-                }),
-                "SETERROR" => Ok(PinentryArgs::SETERROR {
-                    arg: code[2].to_string(),
-                }),
-                "GETPIN" => Ok(PinentryArgs::GETPIN),
-                "BYE" => Ok(PinentryArgs::BYE),
-                _ => Ok(PinentryArgs::UNKNOWN),
+                "SETTITLE" => Ok(Self::SETTITLE(code[2].to_string())),
+                "SETDESC" => Ok(Self::SETDESC(code[2].to_string())),
+                "SETPROMPT" => Ok(Self::SETPROMPT(code[2].to_string())),
+                "SETERROR" => Ok(Self::SETERROR(code[2].to_string())),
+                "GETPIN" => Ok(Self::GETPIN),
+                "BYE" => Ok(Self::BYE),
+                _ => Ok(Self::UNKNOWN),
             }
         } else {
             panic!(); // TODO
@@ -128,13 +120,13 @@ fn main() -> Result<()> {
 
             for line in stdin.lock().lines() {
                 match PinentryArgs::from_str(&line.unwrap()).unwrap() {
-                    PinentryArgs::SETTITLE { arg } => {
+                    PinentryArgs::SETTITLE(_arg) => {
                         print_ok(&mut handle)?;
                     }
-                    PinentryArgs::SETDESC { arg } => {
+                    PinentryArgs::SETDESC(_arg) => {
                         print_ok(&mut handle)?;
                     }
-                    PinentryArgs::SETPROMPT { arg } => {
+                    PinentryArgs::SETPROMPT(arg) => {
                         prompt = Some(arg);
                         print_ok(&mut handle)?;
                     }
