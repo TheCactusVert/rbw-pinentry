@@ -1,9 +1,9 @@
 use std::{
     io::{self, BufRead, Write},
-    process::Output,
     str::FromStr,
 };
 
+use anyhow::Result;
 use clap::{Parser, Subcommand};
 use keyring::Entry;
 use regex::Regex;
@@ -82,21 +82,23 @@ struct Cli {
 
 static SUFFIX: &'static str = "passwd";
 
-fn print_ok<T: Write>(out: &mut T) {
-    out.write(b"OK\n");
-}
-
-fn print_password<T: Write>(out: &mut T, entry: &Entry) -> keyring::Result<()> {
-    let password = entry.get_password()?;
-    write!(out, "D {password}\n");
+fn print_ok<T: Write>(out: &mut T) -> Result<()> {
+    out.write(b"OK\n")?;
     Ok(())
 }
 
-fn print_error<T: Write>(out: &mut T, message: &str) {
-    write!(out, "ERR {message}\n");
+fn print_password<T: Write>(out: &mut T, entry: &Entry) -> Result<()> {
+    let password = entry.get_password()?;
+    write!(out, "D {password}\n")?;
+    Ok(())
 }
 
-fn main() -> keyring::Result<()> {
+fn print_error<T: Write>(out: &mut T, message: &str) -> Result<()> {
+    write!(out, "ERR {message}\n")?;
+    Ok(())
+}
+
+fn main() -> Result<()> {
     let args = Cli::parse();
 
     let user = &args
@@ -111,8 +113,7 @@ fn main() -> keyring::Result<()> {
             entry.set_password(&password)?;
         }
         Commands::Lookup => {
-            let password = entry.get_password()?;
-            println!("{password}");
+            println!("{}", entry.get_password()?);
         }
         Commands::Clear => {
             entry.delete_credential()?;
@@ -128,24 +129,24 @@ fn main() -> keyring::Result<()> {
             for line in stdin.lock().lines() {
                 match PinentryArgs::from_str(&line.unwrap()).unwrap() {
                     PinentryArgs::SETTITLE { arg } => {
-                        print_ok(&mut handle);
+                        print_ok(&mut handle)?;
                     }
                     PinentryArgs::SETDESC { arg } => {
-                        print_ok(&mut handle);
+                        print_ok(&mut handle)?;
                     }
                     PinentryArgs::SETPROMPT { arg } => {
                         prompt = Some(arg);
-                        print_ok(&mut handle);
+                        print_ok(&mut handle)?;
                     }
                     PinentryArgs::GETPIN if prompt == Some("Master Password".to_string()) => {
                         print_password(&mut handle, &entry)?; // TODO fallback
-                        print_ok(&mut handle);
+                        print_ok(&mut handle)?;
                     }
                     PinentryArgs::BYE => {
                         break;
                     }
                     _ => {
-                        print_error(&mut handle, "Unknown command");
+                        print_error(&mut handle, "Unknown command")?;
                     }
                 }
             }
