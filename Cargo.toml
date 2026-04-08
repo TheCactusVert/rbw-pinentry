@@ -1,0 +1,11 @@
+[package]
+name = "rbw-pinentry"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+clap = { version = "4.6.0", features = ["derive", "env"] }
+keyring = { version = "3.6.3", features = ["sync-secret-service"] }
+regex = "1.12.3"
+systemd = { version = "0.10.1", default-features = false }
+
