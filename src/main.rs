@@ -70,20 +70,16 @@ struct Cli {
 
 static SUFFIX: &'static str = "passwd";
 
-fn print_ok<T: Write>(out: &mut T) -> Result<()> {
-    out.write(b"OK\n")?;
-    Ok(())
+fn print_ok<T: Write>(out: &mut T) -> std::io::Result<()> {
+    writeln!(out, "OK")
 }
 
-fn print_password<T: Write>(out: &mut T, entry: &Entry) -> Result<()> {
-    let password = entry.get_password()?;
-    write!(out, "D {password}\n")?;
-    Ok(())
+fn print_password<T: Write>(out: &mut T, password: &str) -> std::io::Result<()> {
+    writeln!(out, "D {password}")
 }
 
-fn print_error<T: Write>(out: &mut T, message: &str) -> Result<()> {
-    write!(out, "ERR {message}\n")?;
-    Ok(())
+fn print_error<T: Write>(out: &mut T, message: &str) -> std::io::Result<()> {
+    writeln!(out, "ERR {message}")
 }
 
 fn main() -> Result<()> {
@@ -115,7 +111,7 @@ fn main() -> Result<()> {
             let mut prompt: Option<String> = None;
 
             for line in stdin.lock().lines() {
-                match PinentryArgs::from_str(&line.unwrap()).unwrap() {
+                match PinentryArgs::from_str(&line.unwrap())? {
                     PinentryArgs::SETTITLE(_arg) => {
                         print_ok(&mut handle)?;
                     }
@@ -127,7 +123,7 @@ fn main() -> Result<()> {
                         print_ok(&mut handle)?;
                     }
                     PinentryArgs::GETPIN if prompt == Some("Master Password".to_string()) => {
-                        print_password(&mut handle, &entry)?; // TODO fallback
+                        print_password(&mut handle, &entry.get_password()?)?; // TODO fallback if no password
                         print_ok(&mut handle)?;
                     }
                     PinentryArgs::BYE => {
