@@ -21,6 +21,20 @@ enum Pinentry {
     UNKNOWN,
 }
 
+impl Pinentry {
+    fn write_ok<T: Write>(out: &mut T) -> std::io::Result<()> {
+        writeln!(out, "OK")
+    }
+
+    fn write_password<T: Write>(out: &mut T, password: &str) -> std::io::Result<()> {
+        writeln!(out, "D {password}")
+    }
+
+    fn write_error<T: Write>(out: &mut T, message: &str) -> std::io::Result<()> {
+        writeln!(out, "ERR {message}")
+    }
+}
+
 impl FromStr for Pinentry {
     type Err = regex::Error;
 
@@ -78,20 +92,6 @@ struct Cli {
     no_global_grab: bool, // TODO Do something with this ?
 }
 
-static SUFFIX: &'static str = "passwd";
-
-fn print_ok<T: Write>(out: &mut T) -> std::io::Result<()> {
-    writeln!(out, "OK")
-}
-
-fn print_password<T: Write>(out: &mut T, password: &str) -> std::io::Result<()> {
-    writeln!(out, "D {password}")
-}
-
-fn print_error<T: Write>(out: &mut T, message: &str) -> std::io::Result<()> {
-    writeln!(out, "ERR {message}")
-}
-
 fn store(entry: &Entry) -> Result<()> {
     let password = prompt_password("Your master password: ")?;
     entry.set_password(&password)?;
@@ -128,36 +128,36 @@ fn pinentry(entry: &Entry) -> Result<()> {
     for line in stdin.lock().lines() {
         match Pinentry::from_str(&line.unwrap())? {
             Pinentry::SETTITLE(_arg) => {
-                print_ok(&mut handle)?;
+                Pinentry::write_ok(&mut handle)?;
             }
             Pinentry::SETDESC(_arg) => {
-                print_ok(&mut handle)?;
+                Pinentry::write_ok(&mut handle)?;
             }
             Pinentry::SETPROMPT(arg) => {
                 prompt = Some(arg);
-                print_ok(&mut handle)?;
+                Pinentry::write_ok(&mut handle)?;
             }
             Pinentry::GETPIN => match prompt.as_ref().map(|p| p.as_str()) {
                 Some("Master Password") => {
                     match entry.get_password() {
                         Ok(password) => {
-                            print_password(&mut handle, &password)?;
-                            print_ok(&mut handle)?;
+                            Pinentry::write_password(&mut handle, &password)?;
+                            Pinentry::write_ok(&mut handle)?;
                         }
                         Err(_e) => {
                             Notification::new()
                                 .summary("rbw - Master password doesn't exist")
                                 .body("Use 'rbw-pinentry store' to create a new entry.")
                                 .show()?;
-                            print_error(&mut handle, "1 no master password")?;
+                            Pinentry::write_error(&mut handle, "1 no master password")?;
                         }
                     };
                 }
                 Some(_) => {
-                    print_error(&mut handle, "2 unknown prompt")?;
+                    Pinentry::write_error(&mut handle, "2 unknown prompt")?;
                 }
                 None => {
-                    print_error(&mut handle, "3 no prompt")?;
+                    Pinentry::write_error(&mut handle, "3 no prompt")?;
                 }
             },
             Pinentry::BYE => {
@@ -170,25 +170,28 @@ fn pinentry(entry: &Entry) -> Result<()> {
                         "Master password is incorrect. Use 'rbw-pinentry store' to edit the entry.",
                     )
                     .show()?;
-                print_error(&mut handle, "4 notification sent")?;
+                Pinentry::write_error(&mut handle, "4 incorrect master password")?;
             }
             _ => {
-                print_error(&mut handle, "5 unknown command")?;
+                Pinentry::write_error(&mut handle, "5 unknown command")?;
             }
         }
     }
+
     Ok(())
 }
+
+static SUFFIX: &'static str = "passwd";
 
 fn main() -> Result<()> {
     let args = Cli::parse();
 
-    let user = &args
+    let profile = &args
         .profile
         .and_then(|p| Some(format!("{p}-{SUFFIX}")))
         .unwrap_or(SUFFIX.to_string());
 
-    let entry = Entry::new("rbw", &user)?;
+    let entry = Entry::new("rbw", &profile)?;
 
     match args.command {
         Some(Commands::Store) => store(&entry),
