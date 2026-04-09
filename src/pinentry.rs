@@ -1,5 +1,11 @@
-use std::{io::Write, str::FromStr};
+use std::{
+    io::{self, BufRead, Write},
+    str::FromStr,
+};
 
+use anyhow::Result;
+use keyring::Entry;
+use notify_rust::Notification;
 use percent_encoding::{CONTROLS, percent_encode};
 use regex::Regex;
 
@@ -37,7 +43,7 @@ impl FromStr for Pinentry {
     }
 }
 
-pub fn write_introduction<T: Write>(out: &mut T) -> std::io::Result<()> {
+fn write_introduction<T: Write>(out: &mut T) -> std::io::Result<()> {
     writeln!(
         out,
         "OK Pleased to meet you, process {}",
@@ -45,15 +51,81 @@ pub fn write_introduction<T: Write>(out: &mut T) -> std::io::Result<()> {
     )
 }
 
-pub fn write_ok<T: Write>(out: &mut T) -> std::io::Result<()> {
+fn write_ok<T: Write>(out: &mut T) -> std::io::Result<()> {
     writeln!(out, "OK")
 }
 
-pub fn write_password<T: Write>(out: &mut T, password: &str) -> std::io::Result<()> {
+fn write_password<T: Write>(out: &mut T, password: &str) -> std::io::Result<()> {
     let password = percent_encode(password.as_bytes(), CONTROLS);
     writeln!(out, "D {password}")
 }
 
-pub fn write_error<T: Write>(out: &mut T, message: &str) -> std::io::Result<()> {
+fn write_error<T: Write>(out: &mut T, message: &str) -> std::io::Result<()> {
     writeln!(out, "ERR {message}")
+}
+
+pub fn exec(entry: &Entry) -> Result<()> {
+    let stdin = io::stdin();
+    let stdout = io::stdout();
+
+    let mut handle = stdout.lock();
+
+    let mut prompt: Option<String> = None;
+
+    write_introduction(&mut handle)?;
+
+    for line in stdin.lock().lines() {
+        match Pinentry::from_str(&line.unwrap())? {
+            Pinentry::SETTITLE(_arg) => {
+                write_ok(&mut handle)?;
+            }
+            Pinentry::SETDESC(_arg) => {
+                write_ok(&mut handle)?;
+            }
+            Pinentry::SETPROMPT(arg) => {
+                prompt = Some(arg);
+                write_ok(&mut handle)?;
+            }
+            Pinentry::GETPIN => match prompt.as_ref().map(|p| p.as_str()) {
+                Some("Master Password") => {
+                    match entry.get_password() {
+                        Ok(password) => {
+                            write_password(&mut handle, &password)?;
+                            write_ok(&mut handle)?;
+                        }
+                        Err(_e) => {
+                            Notification::new()
+                                .summary("rbw - Master password doesn't exist")
+                                .body("Use 'rbw-pinentry store' to create a new entry.")
+                                .show()?;
+                            write_error(&mut handle, "1 no master password")?;
+                        }
+                    };
+                }
+                Some(_) => {
+                    write_error(&mut handle, "2 unknown prompt")?;
+                }
+                None => {
+                    write_error(&mut handle, "3 no prompt")?;
+                }
+            },
+            Pinentry::BYE => {
+                break;
+            }
+            Pinentry::SETERROR(_e) => {
+                Notification::new()
+                    .summary("rbw - Error")
+                    .body(
+                        "Master password is incorrect. Use 'rbw-pinentry store' to edit the entry.",
+                    )
+                    .show()?;
+                write_error(&mut handle, "4 incorrect master password")?;
+            }
+            _ => {
+                write_error(&mut handle, "5 unknown command")?;
+            }
+        }
+    }
+
+    Ok(())
 }

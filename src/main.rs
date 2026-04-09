@@ -1,14 +1,8 @@
 mod pinentry;
 
-use pinentry::Pinentry;
-
-use std::io::{self, BufRead};
-use std::str::FromStr;
-
 use anyhow::{Result, anyhow};
 use clap::{Parser, Subcommand};
 use keyring::Entry;
-use notify_rust::Notification;
 use rpassword::prompt_password;
 
 #[derive(Subcommand)]
@@ -70,72 +64,6 @@ fn clear(entry: &Entry) -> Result<()> {
     Ok(())
 }
 
-fn pinentry(entry: &Entry) -> Result<()> {
-    let stdin = io::stdin();
-    let stdout = io::stdout();
-
-    let mut handle = stdout.lock();
-
-    let mut prompt: Option<String> = None;
-
-    pinentry::write_introduction(&mut handle)?;
-
-    for line in stdin.lock().lines() {
-        match Pinentry::from_str(&line.unwrap())? {
-            Pinentry::SETTITLE(_arg) => {
-                pinentry::write_ok(&mut handle)?;
-            }
-            Pinentry::SETDESC(_arg) => {
-                pinentry::write_ok(&mut handle)?;
-            }
-            Pinentry::SETPROMPT(arg) => {
-                prompt = Some(arg);
-                pinentry::write_ok(&mut handle)?;
-            }
-            Pinentry::GETPIN => match prompt.as_ref().map(|p| p.as_str()) {
-                Some("Master Password") => {
-                    match entry.get_password() {
-                        Ok(password) => {
-                            pinentry::write_password(&mut handle, &password)?;
-                            pinentry::write_ok(&mut handle)?;
-                        }
-                        Err(_e) => {
-                            Notification::new()
-                                .summary("rbw - Master password doesn't exist")
-                                .body("Use 'rbw-pinentry store' to create a new entry.")
-                                .show()?;
-                            pinentry::write_error(&mut handle, "1 no master password")?;
-                        }
-                    };
-                }
-                Some(_) => {
-                    pinentry::write_error(&mut handle, "2 unknown prompt")?;
-                }
-                None => {
-                    pinentry::write_error(&mut handle, "3 no prompt")?;
-                }
-            },
-            Pinentry::BYE => {
-                break;
-            }
-            Pinentry::SETERROR(_e) => {
-                Notification::new()
-                    .summary("rbw - Error")
-                    .body(
-                        "Master password is incorrect. Use 'rbw-pinentry store' to edit the entry.",
-                    )
-                    .show()?;
-                pinentry::write_error(&mut handle, "4 incorrect master password")?;
-            }
-            _ => {
-                pinentry::write_error(&mut handle, "5 unknown command")?;
-            }
-        }
-    }
-
-    Ok(())
-}
-
 static SUFFIX: &'static str = "passwd";
 
 fn main() -> Result<()> {
@@ -152,6 +80,6 @@ fn main() -> Result<()> {
         Some(Commands::Store) => store(&entry),
         Some(Commands::Lookup) => lookup(&entry),
         Some(Commands::Clear) => clear(&entry),
-        None => pinentry(&entry),
+        None => pinentry::exec(&entry),
     }
 }
