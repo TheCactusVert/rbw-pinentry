@@ -7,6 +7,7 @@ use anyhow::{Result, anyhow};
 use clap::{Parser, Subcommand};
 use keyring::Entry;
 use notify_rust::Notification;
+use percent_encoding::{CONTROLS, percent_encode};
 use regex::Regex;
 use rpassword::prompt_password;
 
@@ -22,11 +23,20 @@ enum Pinentry {
 }
 
 impl Pinentry {
+    fn write_introduction<T: Write>(out: &mut T) -> std::io::Result<()> {
+        writeln!(
+            out,
+            "OK Pleased to meet you, process {}",
+            std::process::id()
+        )
+    }
+
     fn write_ok<T: Write>(out: &mut T) -> std::io::Result<()> {
         writeln!(out, "OK")
     }
 
     fn write_password<T: Write>(out: &mut T, password: &str) -> std::io::Result<()> {
+        let password = percent_encode(password.as_bytes(), CONTROLS);
         writeln!(out, "D {password}")
     }
 
@@ -124,6 +134,8 @@ fn pinentry(entry: &Entry) -> Result<()> {
     let mut handle = stdout.lock();
 
     let mut prompt: Option<String> = None;
+
+    Pinentry::write_introduction(&mut handle)?;
 
     for line in stdin.lock().lines() {
         match Pinentry::from_str(&line.unwrap())? {
