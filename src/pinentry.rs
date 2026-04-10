@@ -2,9 +2,9 @@ use std::io::{self, BufRead, Write};
 
 use anyhow::Result;
 use keyring::Entry;
+use lazy_regex::regex;
 use notify_rust::Notification;
 use percent_encoding::{CONTROLS, percent_encode};
-use regex::Regex;
 
 enum Command<'a> {
     SETTITLE(&'a str),
@@ -18,7 +18,7 @@ enum Command<'a> {
 
 impl<'a> From<&'a str> for Command<'a> {
     fn from(input: &'a str) -> Self {
-        let re = Regex::new(r"^(\w*) ?(.*)?$").unwrap();
+        let re = regex!(r"^(\w*) ?(.*)?$");
 
         match re.captures(input) {
             Some(code) => match code[1].to_ascii_uppercase().as_str() {
@@ -35,7 +35,7 @@ impl<'a> From<&'a str> for Command<'a> {
     }
 }
 
-fn write_introduction<T: Write>(out: &mut T) -> std::io::Result<()> {
+fn write_greet<T: Write>(out: &mut T) -> std::io::Result<()> {
     writeln!(
         out,
         "OK Pleased to meet you, process {}",
@@ -68,7 +68,7 @@ pub fn exec(entry: &Entry) -> Result<()> {
 
     let mut prompt: Option<String> = None;
 
-    write_introduction(&mut handle)?;
+    write_greet(&mut handle)?;
 
     for line in stdin.lock().lines() {
         match Command::from(line.unwrap().as_str()) {
@@ -94,15 +94,15 @@ pub fn exec(entry: &Entry) -> Result<()> {
                                 .summary("rbw - Master password doesn't exist")
                                 .body("Use 'rbw-pinentry store' to create a new entry.")
                                 .show()?;
-                            write_error(&mut handle, "1 no master password")?;
+                            write_error(&mut handle, "1 No master password")?;
                         }
                     };
                 }
                 Some(_) => {
-                    write_error(&mut handle, "2 unknown prompt")?;
+                    write_error(&mut handle, "2 Unknown prompt")?;
                 }
                 None => {
-                    write_error(&mut handle, "3 no prompt")?;
+                    write_error(&mut handle, "3 No prompt")?;
                 }
             },
             Command::BYE => {
@@ -116,10 +116,10 @@ pub fn exec(entry: &Entry) -> Result<()> {
                         "Master password is incorrect. Use 'rbw-pinentry store' to edit the entry.",
                     )
                     .show()?;
-                write_error(&mut handle, "4 incorrect master password")?;
+                write_error(&mut handle, "4 Incorrect master password")?;
             }
             _ => {
-                write_error(&mut handle, "5 unknown command")?;
+                write_error(&mut handle, "5 Unknown command")?;
             }
         }
     }
