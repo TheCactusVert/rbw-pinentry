@@ -1,7 +1,4 @@
-use std::{
-    io::{self, BufRead, Write},
-    str::FromStr,
-};
+use std::io::{self, BufRead, Write};
 
 use anyhow::Result;
 use keyring::Entry;
@@ -9,35 +6,31 @@ use notify_rust::Notification;
 use percent_encoding::{CONTROLS, percent_encode};
 use regex::Regex;
 
-enum Command {
-    SETTITLE(String),
-    SETDESC(String),
-    SETPROMPT(String),
-    SETERROR(String),
+enum Command<'a> {
+    SETTITLE(&'a str),
+    SETDESC(&'a str),
+    SETPROMPT(&'a str),
+    SETERROR(&'a str),
     GETPIN,
     BYE,
     UNKNOWN,
 }
 
-impl FromStr for Command {
-    type Err = regex::Error;
+impl<'a> From<&'a str> for Command<'a> {
+    fn from(input: &'a str) -> Self {
+        let re = Regex::new(r"^(\w*) ?(.*)?$").unwrap();
 
-    fn from_str(input: &str) -> std::result::Result<Self, Self::Err> {
-        let re = Regex::new(r"^(\w*) ?(.*)?$")?;
-        re.captures(input);
-
-        if let Some(code) = re.captures(input) {
-            match &code[1] {
-                "SETTITLE" => Ok(Self::SETTITLE(code[2].to_string())),
-                "SETDESC" => Ok(Self::SETDESC(code[2].to_string())),
-                "SETPROMPT" => Ok(Self::SETPROMPT(code[2].to_string())),
-                "SETERROR" => Ok(Self::SETERROR(code[2].to_string())),
-                "GETPIN" => Ok(Self::GETPIN),
-                "BYE" => Ok(Self::BYE),
-                _ => Ok(Self::UNKNOWN),
-            }
-        } else {
-            panic!(); // TODO
+        match re.captures(input) {
+            Some(code) => match code[1].to_ascii_uppercase().as_str() {
+                "SETTITLE" => Self::SETTITLE(code.get(2).unwrap().as_str()),
+                "SETDESC" => Self::SETDESC(code.get(2).unwrap().as_str()),
+                "SETPROMPT" => Self::SETPROMPT(code.get(2).unwrap().as_str()),
+                "SETERROR" => Self::SETERROR(code.get(2).unwrap().as_str()),
+                "GETPIN" => Self::GETPIN,
+                "BYE" => Self::BYE,
+                _ => Self::UNKNOWN,
+            },
+            None => Self::UNKNOWN,
         }
     }
 }
@@ -52,6 +45,10 @@ fn write_introduction<T: Write>(out: &mut T) -> std::io::Result<()> {
 
 fn write_ok<T: Write>(out: &mut T) -> std::io::Result<()> {
     writeln!(out, "OK")
+}
+
+fn write_bye<T: Write>(out: &mut T) -> std::io::Result<()> {
+    writeln!(out, "OK closing connection")
 }
 
 fn write_password<T: Write>(out: &mut T, password: &str) -> std::io::Result<()> {
@@ -74,7 +71,7 @@ pub fn exec(entry: &Entry) -> Result<()> {
     write_introduction(&mut handle)?;
 
     for line in stdin.lock().lines() {
-        match Command::from_str(&line.unwrap())? {
+        match Command::from(line.unwrap().as_str()) {
             Command::SETTITLE(_arg) => {
                 write_ok(&mut handle)?;
             }
@@ -82,7 +79,7 @@ pub fn exec(entry: &Entry) -> Result<()> {
                 write_ok(&mut handle)?;
             }
             Command::SETPROMPT(arg) => {
-                prompt = Some(arg);
+                prompt = Some(arg.to_string());
                 write_ok(&mut handle)?;
             }
             Command::GETPIN => match prompt.as_ref().map(|p| p.as_str()) {
@@ -109,6 +106,7 @@ pub fn exec(entry: &Entry) -> Result<()> {
                 }
             },
             Command::BYE => {
+                write_bye(&mut handle)?;
                 break;
             }
             Command::SETERROR(_e) => {
