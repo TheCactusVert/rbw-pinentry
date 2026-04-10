@@ -2,7 +2,7 @@ use std::io::{self, BufRead, Write};
 
 use anyhow::Result;
 use keyring::Entry;
-use lazy_regex::regex;
+use lazy_regex::regex_captures;
 use notify_rust::Notification;
 use percent_encoding::{CONTROLS, percent_encode};
 
@@ -18,14 +18,12 @@ enum Command<'a> {
 
 impl<'a> From<&'a str> for Command<'a> {
     fn from(input: &'a str) -> Self {
-        let re = regex!(r"^(\w*) ?(.*)?$");
-
-        match re.captures(input) {
-            Some(code) => match code[1].to_ascii_uppercase().as_str() {
-                "SETTITLE" => Self::SETTITLE(code.get(2).unwrap().as_str()),
-                "SETDESC" => Self::SETDESC(code.get(2).unwrap().as_str()),
-                "SETPROMPT" => Self::SETPROMPT(code.get(2).unwrap().as_str()),
-                "SETERROR" => Self::SETERROR(code.get(2).unwrap().as_str()),
+        match regex_captures!(r"^(\w*) ?(.*)?$", input) {
+            Some((_, command, arg)) => match command.to_ascii_uppercase().as_str() {
+                "SETTITLE" => Self::SETTITLE(arg),
+                "SETDESC" => Self::SETDESC(arg),
+                "SETPROMPT" => Self::SETPROMPT(arg),
+                "SETERROR" => Self::SETERROR(arg),
                 "GETPIN" => Self::GETPIN,
                 "BYE" => Self::BYE,
                 _ => Self::UNKNOWN,
