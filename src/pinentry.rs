@@ -9,8 +9,7 @@ use notify_rust::Notification;
 use percent_encoding::{CONTROLS, percent_encode};
 use regex::Regex;
 
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Pinentry {
+enum Command {
     SETTITLE(String),
     SETDESC(String),
     SETPROMPT(String),
@@ -20,7 +19,7 @@ pub enum Pinentry {
     UNKNOWN,
 }
 
-impl FromStr for Pinentry {
+impl FromStr for Command {
     type Err = regex::Error;
 
     fn from_str(input: &str) -> std::result::Result<Self, Self::Err> {
@@ -75,18 +74,18 @@ pub fn exec(entry: &Entry) -> Result<()> {
     write_introduction(&mut handle)?;
 
     for line in stdin.lock().lines() {
-        match Pinentry::from_str(&line.unwrap())? {
-            Pinentry::SETTITLE(_arg) => {
+        match Command::from_str(&line.unwrap())? {
+            Command::SETTITLE(_arg) => {
                 write_ok(&mut handle)?;
             }
-            Pinentry::SETDESC(_arg) => {
+            Command::SETDESC(_arg) => {
                 write_ok(&mut handle)?;
             }
-            Pinentry::SETPROMPT(arg) => {
+            Command::SETPROMPT(arg) => {
                 prompt = Some(arg);
                 write_ok(&mut handle)?;
             }
-            Pinentry::GETPIN => match prompt.as_ref().map(|p| p.as_str()) {
+            Command::GETPIN => match prompt.as_ref().map(|p| p.as_str()) {
                 Some("Master Password") => {
                     match entry.get_password() {
                         Ok(password) => {
@@ -109,10 +108,10 @@ pub fn exec(entry: &Entry) -> Result<()> {
                     write_error(&mut handle, "3 no prompt")?;
                 }
             },
-            Pinentry::BYE => {
+            Command::BYE => {
                 break;
             }
-            Pinentry::SETERROR(_e) => {
+            Command::SETERROR(_e) => {
                 Notification::new()
                     .summary("rbw - Error")
                     .body(
