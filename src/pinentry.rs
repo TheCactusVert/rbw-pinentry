@@ -1,7 +1,7 @@
 use std::io::{self, BufRead, Write};
 
 use anyhow::Result;
-use keyring::Entry;
+use keyring_core::Entry;
 use lazy_regex::regex_captures;
 use notify_rust::Notification;
 use percent_encoding::{CONTROLS, percent_encode};

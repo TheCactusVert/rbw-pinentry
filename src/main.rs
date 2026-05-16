@@ -2,8 +2,9 @@ mod pinentry;
 
 use anyhow::{Result, anyhow};
 use clap::{Parser, Subcommand};
-use keyring::Entry;
+use keyring_core::Entry;
 use rpassword::prompt_password;
+use zbus_secret_service_keyring_store::Store;
 
 #[derive(Subcommand)]
 enum Commands {
@@ -68,6 +69,7 @@ static SUFFIX: &'static str = "passwd";
 
 fn main() -> Result<()> {
     let args = Cli::parse();
+    keyring_core::set_default_store(Store::new()?);
 
     let profile = &args
         .profile
@@ -76,10 +78,14 @@ fn main() -> Result<()> {
 
     let entry = Entry::new("rbw", &profile)?;
 
-    match args.command {
+    let ret = match args.command {
         Some(Commands::Store) => store(&entry),
         Some(Commands::Lookup) => lookup(&entry),
         Some(Commands::Clear) => clear(&entry),
         None => pinentry::exec(&entry),
-    }
+    };
+
+    keyring_core::unset_default_store();
+
+    ret
 }
